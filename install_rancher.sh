@@ -64,44 +64,8 @@ echo "--> Waiting for ${SERVICE_NAME} to become active..."
 until sudo systemctl is-active --quiet "${SERVICE_NAME}"; do sleep 5; done
 echo "--> SUCCESS: ${SERVICE_NAME} is active."
 
-echo -e "\n=================================================="
-echo " [CHECK] Waiting for Ingress Controller Readiness"
-echo "=================================================="
-
-echo "--> Waiting for Kubernetes API to respond..."
-until kubectl get nodes >/dev/null 2>&1; do sleep 2; done
-
-if [[ "$PLATFORM" == "rke2" ]]; then
-    INGRESS_LABEL="app.kubernetes.io/name=rke2-ingress-nginx"
-    INGRESS_NAME="rke2-ingress-nginx-controller"
-else
-    INGRESS_LABEL="app.kubernetes.io/name=traefik"
-    INGRESS_NAME="traefik"
-fi
-
-echo "--> Looking for $INGRESS_NAME with label $INGRESS_LABEL..."
-
-MAX_RETRIES=30
-COUNT=0
-until kubectl -n kube-system get deployment -l "$INGRESS_LABEL" | grep -q "$INGRESS_NAME" || [ $COUNT -eq $MAX_RETRIES ]; do
-    echo "    ...waiting for $INGRESS_NAME to be manifest ($((COUNT*5))s)"
-    sleep 5
-    ((COUNT++))
-done
-
-if [ $COUNT -eq $MAX_RETRIES ]; then
-    echo "❌ TIMEOUT: Ingress deployment didn't appear. Checking events..."
-    kubectl get events -n kube-system | tail -n 5
-    exit 1
-fi
-
-echo "--> Deployment found! Waiting for pods to be ready..."
-kubectl wait --namespace kube-system \
-    --for=condition=available deployment -l "$INGRESS_LABEL" \
-    --timeout=300s
-
-echo "--> SUCCESS: Ingress infrastructure is ready."
-
+echo "--> Sleep 30s for ingress to activate"
+sleep 30
 
 # --- [STEP 2] Configure Shell Environment ---
 echo -e "\n=================================================="
