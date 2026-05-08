@@ -68,30 +68,39 @@ echo -e "\n=================================================="
 echo " [CHECK] Waiting for Ingress Controller Readiness"
 echo "=================================================="
 
+echo "--> Waiting for Kubernetes API to respond..."
+until kubectl get nodes >/dev/null 2>&1; do sleep 2; done
+
 if [[ "$PLATFORM" == "rke2" ]]; then
-    INGRESS_DEPLOY="rke2-ingress-nginx-controller"
+    INGRESS_LABEL="app.kubernetes.io/name=rke2-ingress-nginx"
+    INGRESS_NAME="rke2-ingress-nginx-controller"
 else
-    INGRESS_DEPLOY="traefik"
+    INGRESS_LABEL="app.kubernetes.io/name=traefik"
+    INGRESS_NAME="traefik"
 fi
 
-echo "--> Checking status of $INGRESS_DEPLOY in kube-system..."
+echo "--> Looking for $INGRESS_NAME with label $INGRESS_LABEL..."
 
-until kubectl -n kube-system get deployment "$INGRESS_DEPLOY" >/dev/null 2>&1; do
-    echo "    ...waiting for $INGRESS_DEPLOY deployment to appear"
+MAX_RETRIES=30
+COUNT=0
+until kubectl -n kube-system get deployment -l "$INGRESS_LABEL" | grep -q "$INGRESS_NAME" || [ $COUNT -eq $MAX_RETRIES ]; do
+    echo "    ...waiting for $INGRESS_NAME to be manifest ($((COUNT*5))s)"
     sleep 5
+    ((COUNT++))
 done
 
-echo "--> Deployment found! Waiting for pods to be available..."
-kubectl wait --namespace kube-system \
-    --for=condition=available deployment/"$INGRESS_DEPLOY" \
-    --timeout=300s
-
-if [[ "$PLATFORM" == "rke2" ]]; then
-    echo "--> Giving RKE2 admission webhook a few extra seconds to stabilize..."
-    sleep 10
+if [ $COUNT -eq $MAX_RETRIES ]; then
+    echo "❌ TIMEOUT: Ingress deployment didn't appear. Checking events..."
+    kubectl get events -n kube-system | tail -n 5
+    exit 1
 fi
 
-echo "--> SUCCESS: Ingress infrastructure is ready for Rancher installation."
+echo "--> Deployment found! Waiting for pods to be ready..."
+kubectl wait --namespace kube-system \
+    --for=condition=available deployment -l "$INGRESS_LABEL" \
+    --timeout=300s
+
+echo "--> SUCCESS: Ingress infrastructure is ready."
 
 
 # --- [STEP 2] Configure Shell Environment ---
