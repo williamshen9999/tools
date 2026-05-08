@@ -64,6 +64,36 @@ echo "--> Waiting for ${SERVICE_NAME} to become active..."
 until sudo systemctl is-active --quiet "${SERVICE_NAME}"; do sleep 5; done
 echo "--> SUCCESS: ${SERVICE_NAME} is active."
 
+echo -e "\n=================================================="
+echo " [CHECK] Waiting for Ingress Controller Readiness"
+echo "=================================================="
+
+if [[ "$PLATFORM" == "rke2" ]]; then
+    INGRESS_DEPLOY="rke2-ingress-nginx-controller"
+else
+    INGRESS_DEPLOY="traefik"
+fi
+
+echo "--> Checking status of $INGRESS_DEPLOY in kube-system..."
+
+until kubectl -n kube-system get deployment "$INGRESS_DEPLOY" >/dev/null 2>&1; do
+    echo "    ...waiting for $INGRESS_DEPLOY deployment to appear"
+    sleep 5
+done
+
+echo "--> Deployment found! Waiting for pods to be available..."
+kubectl wait --namespace kube-system \
+    --for=condition=available deployment/"$INGRESS_DEPLOY" \
+    --timeout=300s
+
+if [[ "$PLATFORM" == "rke2" ]]; then
+    echo "--> Giving RKE2 admission webhook a few extra seconds to stabilize..."
+    sleep 10
+fi
+
+echo "--> SUCCESS: Ingress infrastructure is ready for Rancher installation."
+
+
 # --- [STEP 2] Configure Shell Environment ---
 echo -e "\n=================================================="
 echo " [STEP 2] Configuring Shell Environment (~/.bashrc)"
