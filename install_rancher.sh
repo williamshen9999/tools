@@ -64,9 +64,6 @@ echo "--> Waiting for ${SERVICE_NAME} to become active..."
 until sudo systemctl is-active --quiet "${SERVICE_NAME}"; do sleep 5; done
 echo "--> SUCCESS: ${SERVICE_NAME} is active."
 
-echo "--> Sleep 30s for ingress to activate"
-sleep 30
-
 # --- [STEP 2] Configure Shell Environment ---
 echo -e "\n=================================================="
 echo " [STEP 2] Configuring Shell Environment (~/.bashrc)"
@@ -145,6 +142,9 @@ if ! helm list -n cattle-system | grep -q "rancher"; then
 
     echo "--> Creating cattle-system namespace..."
     kubectl create namespace cattle-system --dry-run=client -o yaml | kubectl apply -f -
+
+    echo "--> Sleep 30s for ingress to activate"
+    sleep 30
     
     echo "--> Starting Rancher Helm installation..."
     helm install rancher "${REPO_NAME}/rancher" \
